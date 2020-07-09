@@ -1,2 +1,2 @@
 # electrondynamics
-predicting electron dynamics
+predicting electron dynamics by learning Hamiltonians
