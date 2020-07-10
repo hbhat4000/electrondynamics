@@ -14,10 +14,14 @@ import matplotlib.pyplot as plt
 import numpy as onp
 import scipy.integrate as si
 
-mol = 'h2'
+mol = 'heh+'
 savepath = './'+mol+'LINEAR/'
 rawden = onp.load('./td_dens_re+im_rt-tdexx_delta_s0_'+mol+'_sto-3g.npz',allow_pickle=True)
-overlap = onp.load('./ke+en+overlap+ee_twoe_hf_delta_s0_'+mol+'_sto-3g.npz',allow_pickle=True)
+
+if mol=='heh+':
+    overlap = onp.load('./ke+en+overlap+ee_twoe+dip_hf_delta_s0_'+mol+'_sto-3g.npz',allow_pickle=True)
+else:
+    overlap = onp.load('./ke+en+overlap+ee_twoe_hf_delta_s0_'+mol+'_sto-3g.npz',allow_pickle=True)
 
 # putting things into better variables
 kinmat = overlap['ke_data']
