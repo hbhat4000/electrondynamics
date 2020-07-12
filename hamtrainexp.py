@@ -124,6 +124,7 @@ print('Training loss: ', myloss(theta))
 fname = savepath + 'hamiltoniantheta0.npz'
 onp.savez(fname, theta=theta)
 
+"""
 xdot = (x_inp_train[2:,:] - x_inp_train[:-2,:])/(2*dt)
 rgmmat = vmap(rgm)(x_inp_train[1:-1,:], tint[1:-1])[:,:,0]
 xdotpred = mypred(theta)
@@ -149,5 +150,8 @@ for i in range(ndof):
     plt.ylabel('x[' + str(i) + ']')
     plt.savefig(savepath + 'prefitVALID1' + str(i) + '.pdf')
     plt.close()
+
+"""
+
 
 

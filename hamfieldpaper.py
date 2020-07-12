@@ -1,5 +1,7 @@
 from hamcommon import *
 
+mytol = 1e-12
+
 # INSTEAD OF RETRAINING, LOAD SAVED theta FROM DISK
 fname = savepath + 'hamiltoniantheta0.npz'
 theta = onp.load(fname)['theta']
@@ -256,8 +258,8 @@ tvec = dt*onp.arange(intpts-offset)
 print(tvec[-1])
 initcond = onp.array(denMOflat[offset,:])
 
-EXsol = si.solve_ivp(EXhamrhs, [0, tvec[-1]], initcond, 'RK45', t_eval = tvec, rtol=1e-9, atol=1e-9)
-MLsol = si.solve_ivp(MLhamrhs, [0, tvec[-1]], initcond, 'RK45', t_eval = tvec, rtol=1e-9, atol=1e-9)
+EXsol = si.solve_ivp(EXhamrhs, [0, tvec[-1]], initcond, 'RK45', t_eval = tvec, rtol=mytol, atol=mytol)
+MLsol = si.solve_ivp(MLhamrhs, [0, tvec[-1]], initcond, 'RK45', t_eval = tvec, rtol=mytol, atol=mytol)
 
 # error between propagating exact Hamiltonian and Gaussian data
 print(onp.mean(onp.square(onp.abs( EXsol.y.T - denMOflat[offset:intpts,:] ))))
@@ -268,61 +270,77 @@ print(onp.mean(onp.square(onp.abs( MLsol.y.T - denMOflat[offset:intpts,:] ))))
 # error between propagating exact Hamiltonian and propagating machine learned Hamiltonian
 print(onp.mean(onp.square(onp.abs( MLsol.y.T - EXsol.y.T ))))
 
-fig = plt.figure(figsize=((8,8)))
-fig.suptitle('exact Hamiltonian propagation error', y=0.925)
-
-for ij in nzreals:
-    sol1 = np.real(EXsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]])
-    sol2 = np.real(denMO[offset:intpts,ij[0],ij[1]])
-    plt.plot(np.abs(sol1-sol2))
-
-for ij in nzimags:
-    sol1 = np.imag(EXsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]])
-    sol2 = np.imag(denMO[offset:intpts,ij[0],ij[1]])
-    plt.plot(np.abs(sol1-sol2))
-
-plt.savefig(savepath + 'EXHamPropErr.pdf')
-plt.close()
-
-fig = plt.figure(figsize=((8,8)))
-fig.suptitle('machine learning Hamiltonian propagation error', y=0.925)
-
-for ij in nzreals:
-    sol1 = np.real(MLsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]])
-    sol2 = np.real(denMO[offset:intpts,ij[0],ij[1]])
-    plt.plot(np.abs(sol1-sol2))
-
-for ij in nzimags:
-    sol1 = np.imag(MLsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]])
-    sol2 = np.imag(denMO[offset:intpts,ij[0],ij[1]])
-    plt.plot(np.abs(sol1-sol2))
-
-plt.savefig(savepath + 'EXHamPropErr.pdf')
-plt.close()
-
-fig = plt.figure(figsize=((8,8)))
-fig.suptitle('Gaussian (black), exact-H (blue), and ML-H (red) propagation results', y=0.9)
-ctr = 0
-for ij in nzreals:
-    plt.plot(onp.real(EXsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
-    plt.plot(onp.real(MLsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
-    plt.plot(onp.real(denMO[offset:intpts,ij[0],ij[1]]), 'k-')
-    ctr += 1
-    if ctr == 3:
-        break
+# compute and save time-dependent propagation errors 
+tdexHamerr = onp.mean(onp.square(onp.abs( EXsol.y.T - denMOflat[offset:intpts,:] )), axis=1)
+tdmlHamerr = onp.mean(onp.square(onp.abs( MLsol.y.T - denMOflat[offset:intpts,:] )), axis=1)
+tdexmlerr = onp.mean(onp.square(onp.abs( EXsol.y.T - MLsol.y.T )), axis=1)
+onp.savez('./'+mol+'tdHamerr.npz',tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
 
 """
+fig = plt.figure(figsize=((8,8)))
+fig.suptitle('Gaussian (black), exact-H (blue), and ML-H (red) propagation results')
+fig, ax1 = plt.subplots()
+ij = realnzs[0]
+ax1.plot(onp.real(EXsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
+ax1.plot(onp.real(MLsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
+ax1.plot(onp.real(denMO[offset:intpts,ij[0],ij[1]]), 'k-')
+ax1.set_xlabel('time')
+ax1.set_ylabel('P_'+str(ij))
+ax1.tick_params(axis='y')
+
+ij = realnzs[1]
+ax2 = ax1.twinx()
+ax2.plot(onp.real(EXsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
+ax2.plot(onp.real(MLsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
+ax2.plot(onp.real(denMO[offset:intpts,ij[0],ij[1]]), 'k-')
+ax2.set_ylabel('P_'+str(ij))
+ax2.tick_params(axis='y')
+
+fig.tight_layout()
+fig.savefig('./' + mol + 'prop.pdf')
+plt.close()
+"""
+
+fig = plt.figure(figsize=((8,12)))
+axs = fig.subplots(d)
+fig.suptitle('Gaussian (black), exact-H (blue), and ML-H (red) propagation results',y=0.9)
+ctr = 0
+mylabels = []
+for ij in nzreals:
+    axs[ctr].plot(onp.real(EXsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
+    axs[ctr].plot(onp.real(MLsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
+    axs[ctr].plot(onp.real(denMO[offset:intpts,ij[0],ij[1]]), 'k-')
+    ijprime = (ij[0]+1, ij[1]+1)
+    thislabel = 'Re(P_' + str(ijprime) + ')'
+    mylabels.append(thislabel)
+    ctr += 1
+
 for ij in nzimags:
     axs[ctr].plot(onp.imag(EXsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
-    axs[ctr].plot(onp.imag(denMO[offset:intpts,ij[0],ij[1]]), 'r-')
+    axs[ctr].plot(onp.imag(MLsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
+    axs[ctr].plot(onp.imag(denMO[offset:intpts,ij[0],ij[1]]), 'k-')
+    ijprime = (ij[0]+1, ij[1]+1)
+    thislabel = 'Im(P_' + str(ijprime) + ')'
+    mylabels.append(thislabel)
     ctr += 1
-"""
+
+plt.subplots_adjust(wspace=0, hspace=0)
+
+cnt = 0
+for ax in axs.flat:
+    ax.set(xlabel='time', ylabel=mylabels[cnt])
+    if cnt % 2 == 0:
+        ax.yaxis.set_label_position("right")
+        ax.yaxis.tick_right()
+    cnt += 1
+
+for ax in axs.flat:
+    ax.label_outer()
 
 fig.savefig('./' + mol + 'prop.pdf')
 plt.close()
 
 fielddens = onp.load('./td_dens_re+im_rt-tdexx_ndlaser1cycs0_'+mol+'_sto-3g.npz',allow_pickle=True)
-
 fieldden = fielddens['td_dens_re_data'] + 1j*fielddens['td_dens_im_data']
 
 # change basis
@@ -342,9 +360,8 @@ tvec = dt*onp.arange(intpts-offset)
 print(tvec[-1])
 initcond = onp.array(fielddenMOnodupflat[offset,:])
 
-EXsolwf = si.solve_ivp(EXhamwfrhs, onp.array([0, tvec[-1]]), initcond, t_eval = tvec, rtol=1e-12, atol=1e-12)
-
-MLsolwf = si.solve_ivp(MLhamwfrhs, onp.array([0, tvec[-1]]), initcond, t_eval = tvec, rtol=1e-12, atol=1e-12)
+EXsolwf = si.solve_ivp(EXhamwfrhs, onp.array([0, tvec[-1]]), initcond, t_eval = tvec, rtol=mytol, atol=mytol)
+MLsolwf = si.solve_ivp(MLhamwfrhs, onp.array([0, tvec[-1]]), initcond, t_eval = tvec, rtol=mytol, atol=mytol)
 
 # error between propagating exact Hamiltonian and Gaussian data
 print(onp.mean(onp.square(onp.abs( EXsolwf.y.T - fielddenMOnodupflat[offset:intpts,:] ))))
@@ -355,35 +372,51 @@ print(onp.mean(onp.square(onp.abs( MLsolwf.y.T - fielddenMOnodupflat[offset:intp
 # error between propagating exact Hamiltonian and propagating machine learned Hamiltonian
 print(onp.mean(onp.square(onp.abs( EXsolwf.y.T - MLsolwf.y.T ))))
 
-fig = plt.figure(figsize=((8,8)))
-fig.suptitle('exact Hamiltonian with field propagation error', y=0.925)
+# compute and save time-dependent propagation errors 
+tdexHamerr = onp.mean(onp.square(onp.abs( EXsolwf.y.T - fielddenMOnodupflat[offset:intpts,:] )), axis=1)
+tdmlHamerr = onp.mean(onp.square(onp.abs( MLsolwf.y.T - fielddenMOnodupflat[offset:intpts,:] )), axis=1)
+tdexmlerr = onp.mean(onp.square(onp.abs( EXsolwf.y.T - MLsolwf.y.T )), axis=1)
+onp.savez('./'+mol+'tdHamerrWF.npz',tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
 
+fig = plt.figure(figsize=((8,12)))
+axs = fig.subplots(d)
+fig.suptitle('Gaussian (black), exact-H (blue), and ML-H (red) propagation results',y=0.9)
+ctr = 0
+mylabels = []
 for ij in nzreals:
-    sol1 = np.real(EXsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]])
-    sol2 = np.real(fielddenMOnodup[offset:intpts,ij[0],ij[1]])
-    plt.plot(np.abs(sol1-sol2))
+    axs[ctr].plot(onp.real(EXsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
+    axs[ctr].plot(onp.real(MLsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
+    axs[ctr].plot(onp.real(fielddenMOnodup[offset:intpts,ij[0],ij[1]]), 'k-')
+    ijprime = (ij[0]+1, ij[1]+1)
+    thislabel = 'Re(P_' + str(ijprime) + ')'
+    mylabels.append(thislabel)
+    ctr += 1
 
 for ij in nzimags:
-    sol1 = np.imag(EXsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]])
-    sol2 = np.imag(fielddenMOnodup[offset:intpts,ij[0],ij[1]])
-    plt.plot(np.abs(sol1-sol2))
-
-plt.savefig(savepath + 'EXWFHamPropErr.pdf')
-plt.close()
-
-fig = plt.figure(figsize=((8,8)))
-fig.suptitle('Gaussian (black), exact-H (blue), and ML-H (red) propagation results', y=0.9)
-ctr = 0
-for ij in nzreals:
-    plt.plot(onp.real(EXsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
-    plt.plot(onp.real(MLsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
-    plt.plot(onp.real(fielddenMOnodup[offset:intpts,ij[0],ij[1]]), 'k-')
+    axs[ctr].plot(onp.imag(EXsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
+    axs[ctr].plot(onp.imag(MLsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
+    axs[ctr].plot(onp.imag(fielddenMOnodup[offset:intpts,ij[0],ij[1]]), 'k-')
+    ijprime = (ij[0]+1, ij[1]+1)
+    thislabel = 'Im(P_' + str(ijprime) + ')'
+    mylabels.append(thislabel)
     ctr += 1
-    if ctr == 3:
-        break
+
+plt.subplots_adjust(wspace=0, hspace=0)
+
+cnt = 0
+for ax in axs.flat:
+    ax.set(xlabel='time', ylabel=mylabels[cnt])
+    if cnt % 2 == 0:
+        ax.yaxis.set_label_position("right")
+        ax.yaxis.tick_right()
+    cnt += 1
+
+for ax in axs.flat:
+    ax.label_outer()
 
 fig.savefig('./' + mol + 'propWF.pdf')
 plt.close()
+
 
 
 

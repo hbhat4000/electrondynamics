@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as onp
 import scipy.integrate as si
 
-mol = 'heh+'
+mol = 'lih'
 savepath = './'+mol+'LINEAR/'
 rawden = onp.load('./td_dens_re+im_rt-tdexx_delta_s0_'+mol+'_sto-3g.npz',allow_pickle=True)
 
