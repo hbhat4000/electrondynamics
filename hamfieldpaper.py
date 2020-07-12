@@ -1,6 +1,6 @@
 from hamcommon import *
 
-mytol = 1e-12
+mytol = 1e-6
 
 # INSTEAD OF RETRAINING, LOAD SAVED theta FROM DISK
 fname = savepath + 'hamiltoniantheta0.npz'

@@ -147,6 +147,7 @@ print('ndof: ', ndof)
 
 # build two dictionaries that help us find the absolute column number given human-readable (i,j) indices
 # for both the real and imaginary non-zero Hamiltonian DOFs
+"""
 hamreals = {}
 hamimags = {}
 cnt = 0
@@ -159,6 +160,9 @@ for i in range(denMO.shape[1]):
     for j in range(i+1, denMO.shape[1]):
        hamimags[(i,j)] = cnt
        cnt += 1
+"""
+hamreals = nzreals.copy()
+hamimags = nzimags.copy()
 
 print('hamreals:')
 print(hamreals)
