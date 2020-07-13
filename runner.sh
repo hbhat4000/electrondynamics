@@ -7,7 +7,7 @@ cat /usr/local/cuda/version.txt
 # pip install --upgrade jax
 
 # train
-# python hamtrainexp.py > ./lihresults1.txt
+python hamtrainexp.py > ./lihresults1.txt
 
 # test
 python hamfieldpaper.py > ./lihresults2.txt

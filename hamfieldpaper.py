@@ -261,19 +261,20 @@ initcond = onp.array(denMOflat[offset,:])
 EXsol = si.solve_ivp(EXhamrhs, [0, tvec[-1]], initcond, 'RK45', t_eval = tvec, rtol=mytol, atol=mytol)
 MLsol = si.solve_ivp(MLhamrhs, [0, tvec[-1]], initcond, 'RK45', t_eval = tvec, rtol=mytol, atol=mytol)
 
-# error between propagating exact Hamiltonian and Gaussian data
-print(onp.mean(onp.square(onp.abs( EXsol.y.T - denMOflat[offset:intpts,:] ))))
-
 # error between propagating machine learned Hamiltonian and Gaussian data
-print(onp.mean(onp.square(onp.abs( MLsol.y.T - denMOflat[offset:intpts,:] ))))
+print(onp.mean(onp.linalg.norm( MLsol.y.T.reshape((-1,drc,drc)) - denMO[offset:intpts,:,:], axis = (1,2) )))
+
+# error between propagating exact Hamiltonian and Gaussian data
+print(onp.mean(onp.linalg.norm( EXsol.y.T.reshape((-1,drc,drc)) - denMO[offset:intpts,:,:] , axis = (1,2) )))
 
 # error between propagating exact Hamiltonian and propagating machine learned Hamiltonian
-print(onp.mean(onp.square(onp.abs( MLsol.y.T - EXsol.y.T ))))
+print(onp.mean(onp.linalg.norm( EXsol.y.T.reshape((-1,drc,drc)) - MLsol.y.T.reshape((-1,drc,drc)), axis = (1,2) )))
 
 # compute and save time-dependent propagation errors 
-tdexHamerr = onp.mean(onp.square(onp.abs( EXsol.y.T - denMOflat[offset:intpts,:] )), axis=1)
-tdmlHamerr = onp.mean(onp.square(onp.abs( MLsol.y.T - denMOflat[offset:intpts,:] )), axis=1)
-tdexmlerr = onp.mean(onp.square(onp.abs( EXsol.y.T - MLsol.y.T )), axis=1)
+tdexHamerr = onp.linalg.norm( EXsol.y.T.reshape((-1,drc,drc)) - denMO[offset:intpts,:,:] , axis=(1,2))
+tdmlHamerr = onp.linalg.norm( MLsol.y.T.reshape((-1,drc,drc)) - denMO[offset:intpts,:,:] , axis=(1,2))
+tdexmlerr = onp.linalg.norm( EXsol.y.T.reshape((-1,drc,drc)) - MLsol.y.T.reshape((-1,drc,drc)) , axis=(1,2))
+
 onp.savez('./'+mol+'tdHamerr.npz',tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
 
 """
@@ -363,19 +364,19 @@ initcond = onp.array(fielddenMOnodupflat[offset,:])
 EXsolwf = si.solve_ivp(EXhamwfrhs, onp.array([0, tvec[-1]]), initcond, t_eval = tvec, rtol=mytol, atol=mytol)
 MLsolwf = si.solve_ivp(MLhamwfrhs, onp.array([0, tvec[-1]]), initcond, t_eval = tvec, rtol=mytol, atol=mytol)
 
-# error between propagating exact Hamiltonian and Gaussian data
-print(onp.mean(onp.square(onp.abs( EXsolwf.y.T - fielddenMOnodupflat[offset:intpts,:] ))))
-
 # error between propagating machine learned Hamiltonian and Gaussian data
-print(onp.mean(onp.square(onp.abs( MLsolwf.y.T - fielddenMOnodupflat[offset:intpts,:] ))))
+print(onp.mean(onp.linalg.norm( MLsolwf.y.T.reshape((-1,drc,drc)) - fielddenMOnodup[offset:intpts,:,:], axis = (1,2) )))
+
+# error between propagating exact Hamiltonian and Gaussian data
+print(onp.mean(onp.linalg.norm( EXsolwf.y.T.reshape((-1,drc,drc)) - fielddenMOnodup[offset:intpts,:,:] , axis = (1,2) )))
 
 # error between propagating exact Hamiltonian and propagating machine learned Hamiltonian
-print(onp.mean(onp.square(onp.abs( EXsolwf.y.T - MLsolwf.y.T ))))
+print(onp.mean(onp.linalg.norm( EXsolwf.y.T.reshape((-1,drc,drc)) - MLsolwf.y.T.reshape((-1,drc,drc)), axis = (1,2) )))
 
 # compute and save time-dependent propagation errors 
-tdexHamerr = onp.mean(onp.square(onp.abs( EXsolwf.y.T - fielddenMOnodupflat[offset:intpts,:] )), axis=1)
-tdmlHamerr = onp.mean(onp.square(onp.abs( MLsolwf.y.T - fielddenMOnodupflat[offset:intpts,:] )), axis=1)
-tdexmlerr = onp.mean(onp.square(onp.abs( EXsolwf.y.T - MLsolwf.y.T )), axis=1)
+tdexHamerr = onp.linalg.norm( EXsolwf.y.T.reshape((-1,drc,drc)) - fielddenMOnodup[offset:intpts,:,:] , axis=(1,2))
+tdmlHamerr = onp.linalg.norm( MLsolwf.y.T.reshape((-1,drc,drc)) - fielddenMOnodup[offset:intpts,:,:] , axis=(1,2))
+tdexmlerr = onp.linalg.norm( EXsolwf.y.T.reshape((-1,drc,drc)) - MLsolwf.y.T.reshape((-1,drc,drc)) , axis=(1,2))
 onp.savez('./'+mol+'tdHamerrWF.npz',tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
 
 fig = plt.figure(figsize=((8,12)))
