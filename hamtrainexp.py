@@ -105,9 +105,10 @@ def mypred(theta):
 # note that the loss function is the SUM of squared errors here,
 # this is intentional to magnify the error
 # MSE looks artificially low because of the large denominator
+weights = onp.linalg.norm(x_inp_train,axis=0)**(-2)
 def myloss(theta):
     pred = mypred(theta)
-    loss = np.sum(np.square(xdot - pred))
+    loss = np.sum(weights*np.square(xdot - pred))
     return loss
 
 jmyloss = jit(myloss)
@@ -116,10 +117,18 @@ hess = jit(jacobian(grad(myloss)))
 
 # TRAIN AND SAVE theta TO DISK
 theta0 = np.zeros(nump*hamdof)
-rhs = onp.array(gradmyloss(theta0)/-2)
+
+# pseudoinverse
+# rhs = onp.array(gradmyloss(theta0)/-2)
+# hessmat = onp.array(hess(theta0))
+# theta = onp.linalg.pinv(0.5*hessmat) @ rhs
+
+# least squares solve
+rhs = onp.array(gradmyloss(theta0))
 hessmat = onp.array(hess(theta0))
-theta = onp.linalg.pinv(0.5*hessmat) @ rhs
+theta,_,_,_ = onp.linalg.lstsq(-hessmat,rhs,rcond=None)
 print('Training loss: ', myloss(theta))
+print('|| Grad(loss) || at theta: ', onp.linalg.norm(gradmyloss(theta)))
 
 fname = savepath + 'hamiltoniantheta0.npz'
 onp.savez(fname, theta=theta)

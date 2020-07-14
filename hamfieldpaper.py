@@ -1,6 +1,6 @@
 from hamcommon import *
 
-mytol = 1e-6
+mytol = 1e-10
 
 # INSTEAD OF RETRAINING, LOAD SAVED theta FROM DISK
 fname = savepath + 'hamiltoniantheta0.npz'
@@ -145,6 +145,26 @@ elif mol == 'lih':
                 [0.667143, 0.147240, 0.180330e+01, 0., 0., 0.144564e+01]])
     didat[2] += onp.tril(didat[2], k=-1).T
 
+elif mol == 'c2h4':
+    didat = [[]]*3
+    didat[0] = onp.zeros((drc,drc))
+    didat[1] = onp.zeros((drc,drc))
+    didat[2] = onp.array([[0.126517e1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+       [0.314221, 0.126517e1, 0,0,0,0,0,0,0,0,0,0,0,0],
+       [0.,0.,0.126517e1 ,0,0,0,0,0,0,0,0,0,0,0],
+       [0.,0.,0.,0.126517e1 ,0,0,0,0,0,0,0,0,0,0],
+       [0.718555e-01,  0.838744,  0., 0., 0.126517e1, 0,0,0,0,0,0,0,0,0],
+       [0., -0.490823e-01, 0., 0., 0.813421e-01, -0.126517e1, 0,0,0,0,0,0,0,0],
+       [0.490823e-01, 0., 0., 0., 0.244692, -0.314221, -0.126517e1, 0,0,0,0,0,0,0],
+       [0,0,0,0,0,0,0, -0.126517e1, 0,0,0,0,0,0],
+       [0,0,0,0,0,0,0,0,-0.126517e1, 0,0,0,0,0],
+       [0.813421e-01,  0.244692,  0,0,0,  0.718555e-01,  0.838744, 0., 0., -0.126517e1, 0,0,0,0],
+       [0.838104e-01,  0.898824,  0, 0.724971,  0.794395, -0.681175e-02, 0.463892e-01,0.,0.247053e-01, 0.125735, 0.232833e+01, 0.,0.,0.],
+       [0.838104e-01,  0.898824,  0., -0.724971,  0.794395, -0.681175e-02,  0.463892e-01, 0., -0.247053e-01, 0.125735, 0.348982,  0.232833e1, 0.,0.],
+       [0.681175e-02, -0.463892e-01, 0., -0.247053e-01,  0.125735, -0.838104e-01, -0.898824,  0., -0.724971,  0.794395, 0.,  0., -0.232833e1, 0.],
+       [0.681175e-02, -0.463892e-01, 0., 0.247053e-01,  0.125735, -0.838104e-01, -0.898824,  0.,  0.724971,  0.794395, 0.,  0., -0.348982, -0.232833e1]])
+    didat[2] += onp.tril(didat[2], k=-1).T
+
 print(didat[2])
 
 # EXACT deltakick Hamiltonian, NO FIELD
@@ -203,6 +223,8 @@ def EXhamwfrhs(t, pin):
         hAO = (onp.array(kinmat - enmat, dtype=onp.complex128) + twoe) + hfieldAO
     elif mol == 'lih':
         hAO = (onp.array(kinmat - enmat, dtype=onp.complex128) + twoe) + hfieldAO
+    elif mol == 'c2h4':
+        hAO = (onp.array(kinmat - enmat, dtype=onp.complex128) + twoe) + hfieldAO
     elif mol == 'h2':
         hAO = (onp.array(kinmat - enmat, dtype=onp.complex128) + twoe) - hfieldAO
 
@@ -246,6 +268,8 @@ def MLhamwfrhs(t, pin):
         h -= xmat.conj().T @ hfieldAO @ xmat
     elif mol == 'lih':
         h -= xmat.conj().T @ hfieldAO @ xmat
+    elif mol == 'c2h4':
+        h -= xmat.conj().T @ hfieldAO @ xmat
     elif mol == 'h2':
         h += xmat.conj().T @ hfieldAO @ xmat
     
@@ -275,7 +299,7 @@ tdexHamerr = onp.linalg.norm( EXsol.y.T.reshape((-1,drc,drc)) - denMO[offset:int
 tdmlHamerr = onp.linalg.norm( MLsol.y.T.reshape((-1,drc,drc)) - denMO[offset:intpts,:,:] , axis=(1,2))
 tdexmlerr = onp.linalg.norm( EXsol.y.T.reshape((-1,drc,drc)) - MLsol.y.T.reshape((-1,drc,drc)) , axis=(1,2))
 
-onp.savez('./'+mol+'tdHamerr.npz',tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
+onp.savez(savepath+mol+'tdHamerr.npz',tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
 
 """
 fig = plt.figure(figsize=((8,8)))
@@ -302,7 +326,7 @@ fig.savefig('./' + mol + 'prop.pdf')
 plt.close()
 """
 
-fig = plt.figure(figsize=((8,12)))
+fig = plt.figure(figsize=((8,36)))
 axs = fig.subplots(d)
 fig.suptitle('Gaussian (black), exact-H (blue), and ML-H (red) propagation results',y=0.9)
 ctr = 0
@@ -338,7 +362,7 @@ for ax in axs.flat:
 for ax in axs.flat:
     ax.label_outer()
 
-fig.savefig('./' + mol + 'prop.pdf')
+fig.savefig(savepath + mol + 'prop.pdf')
 plt.close()
 
 fielddens = onp.load('./td_dens_re+im_rt-tdexx_ndlaser1cycs0_'+mol+'_sto-3g.npz',allow_pickle=True)
@@ -377,9 +401,9 @@ print(onp.mean(onp.linalg.norm( EXsolwf.y.T.reshape((-1,drc,drc)) - MLsolwf.y.T.
 tdexHamerr = onp.linalg.norm( EXsolwf.y.T.reshape((-1,drc,drc)) - fielddenMOnodup[offset:intpts,:,:] , axis=(1,2))
 tdmlHamerr = onp.linalg.norm( MLsolwf.y.T.reshape((-1,drc,drc)) - fielddenMOnodup[offset:intpts,:,:] , axis=(1,2))
 tdexmlerr = onp.linalg.norm( EXsolwf.y.T.reshape((-1,drc,drc)) - MLsolwf.y.T.reshape((-1,drc,drc)) , axis=(1,2))
-onp.savez('./'+mol+'tdHamerrWF.npz',tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
+onp.savez(savepath+mol+'tdHamerrWF.npz',tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
 
-fig = plt.figure(figsize=((8,12)))
+fig = plt.figure(figsize=((8,36)))
 axs = fig.subplots(d)
 fig.suptitle('Gaussian (black), exact-H (blue), and ML-H (red) propagation results',y=0.9)
 ctr = 0
@@ -415,7 +439,7 @@ for ax in axs.flat:
 for ax in axs.flat:
     ax.label_outer()
 
-fig.savefig('./' + mol + 'propWF.pdf')
+fig.savefig(savepath + mol + 'propWF.pdf')
 plt.close()
 
 
