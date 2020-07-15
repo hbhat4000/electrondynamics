@@ -128,11 +128,17 @@ theta0 = np.zeros(nump*hamdof)
 # theta = onp.linalg.pinv(0.5*hessmat) @ rhs
 
 # least squares solve
+# note we could try doing this with scipy.linalg as well
 rhs = onp.array(gradmyloss(theta0))
 hessmat = onp.array(hess(theta0))
-theta,_,_,_ = onp.linalg.lstsq(-hessmat,rhs,rcond=None)
+theta,_,_,_ = onp.linalg.lstsq(hessmat,-rhs,rcond=-1)
 print('Training loss: ', myloss(theta))
 print('|| Grad(loss) || at theta: ', onp.linalg.norm(gradmyloss(theta)))
+
+if mol == 'h2' or mol == 'heh+':
+    test = (onp.eye(hessmat.shape[0]) - hessmat @ onp.linalg.pinv(hessmat)) @ rhs
+    print(test)
+    print(onp.linalg.norm(test))
 
 fname = savepath + 'hamiltoniantheta0.npz'
 onp.savez(fname, theta=theta)
