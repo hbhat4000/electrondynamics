@@ -105,7 +105,11 @@ def mypred(theta):
 # note that the loss function is the SUM of squared errors here,
 # this is intentional to magnify the error
 # MSE looks artificially low because of the large denominator
-weights = onp.linalg.norm(x_inp_train,axis=0)**(-2)
+# weights = onp.linalg.norm(x_inp_train,axis=0)**(-2)
+# weights = onp.var(x_inp_train,axis=0)**(-1.0)
+weights = onp.ones(d)
+print("weights:")
+print(weights)
 def myloss(theta):
     pred = mypred(theta)
     loss = np.sum(weights*np.square(xdot - pred))
@@ -133,7 +137,6 @@ print('|| Grad(loss) || at theta: ', onp.linalg.norm(gradmyloss(theta)))
 fname = savepath + 'hamiltoniantheta0.npz'
 onp.savez(fname, theta=theta)
 
-"""
 xdot = (x_inp_train[2:,:] - x_inp_train[:-2,:])/(2*dt)
 rgmmat = vmap(rgm)(x_inp_train[1:-1,:], tint[1:-1])[:,:,0]
 xdotpred = mypred(theta)
@@ -160,7 +163,6 @@ for i in range(ndof):
     plt.savefig(savepath + 'prefitVALID1' + str(i) + '.pdf')
     plt.close()
 
-"""
 
 
 

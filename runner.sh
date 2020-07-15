@@ -10,8 +10,8 @@
 # pip install --upgrade jax
 
 # train
-python hamtrainexp.py > ./c2h4LINEAR/c2h4results1.txt
+python hamtrainexp.py > ./lihLINEAR/lihresults1.txt
 
 # test
-python hamfieldpaper.py > ./c2h4LINEAR/c2h4results2.txt
+python hamfieldpaper.py > ./lihLINEAR/lihresults2.txt
 

@@ -1,6 +1,6 @@
 from hamcommon import *
 
-mytol = 1e-10
+mytol = 1e-12
 
 # INSTEAD OF RETRAINING, LOAD SAVED theta FROM DISK
 fname = savepath + 'hamiltoniantheta0.npz'
@@ -112,7 +112,8 @@ for j in range(ncp):
 plt.plot(onp.linalg.norm(hamerr, axis=(1,2)))
 plt.xlabel('time')
 plt.ylabel('|| H_true - H_ML ||')
-plt.show()
+plt.savefig(savepath + 'hamiltonianerror.pdf')
+plt.close()
 
 auxdata = onp.load('./ke+en+overlap+ee_twoe+dip_hf_ndlaser1cyc_s0_'+mol+'_sto-3g.npz', allow_pickle=True)
 
@@ -204,6 +205,7 @@ def MLhamrhs(t, pin):
 
 # EXACT deltakick Hamiltonian, WITH FIELD ON
 def EXhamwfrhs(t, pin):
+    """
     i = int(t//dt)
     if i+offset > 1775:
         ez = 0
@@ -212,6 +214,14 @@ def EXhamwfrhs(t, pin):
     else:
         frac = t/dt - i
         ez = (1-frac)*efdat[2,i+offset] + frac*efdat[2,i+1+offset]
+    """
+    freq = 0.0428
+    if t > 2*onp.pi/freq:
+        ez = 0
+    elif t < 0:
+        ez = 0
+    else:
+        ez = 0.05*onp.sin(0.0428*t)
 
     hfieldAO = onp.array(ez*didat[2], dtype=onp.complex128)
 
@@ -235,6 +245,7 @@ def EXhamwfrhs(t, pin):
 
 # MACHINE LEARNED deltakick Hamiltonian, WITH FIELD ON
 def MLhamwfrhs(t, pin):
+    """
     i = int(t//dt)
     if i+offset > 1775:
         ez = 0
@@ -243,7 +254,17 @@ def MLhamwfrhs(t, pin):
     else:
         frac = t/dt - i
         ez = (1-frac)*efdat[2,i+offset] + frac*efdat[2,i+1+offset]
+    """
 
+    freq = 0.0428
+    if t > 2*onp.pi/freq:
+        ez = 0
+    elif t < 0:
+        ez = 0
+    else:
+        ez = 0.05*onp.sin(0.0428*t)
+
+    hfieldAO = onp.array(ez*didat[2], dtype=onp.complex128)
     hfieldAO = onp.array(ez*didat[2], dtype=onp.complex128)
 
     p = pin.reshape(drc,drc)
@@ -277,7 +298,7 @@ def MLhamwfrhs(t, pin):
     return rhs.reshape(drc**2)
 
 # propagate forward in time using ML ham
-intpts = 1000
+intpts = 2000
 tvec = dt*onp.arange(intpts-offset)
 print(tvec[-1])
 initcond = onp.array(denMOflat[offset,:])
@@ -326,24 +347,28 @@ fig.savefig('./' + mol + 'prop.pdf')
 plt.close()
 """
 
-fig = plt.figure(figsize=((8,36)))
+if mol == 'lih':
+    fig = plt.figure(figsize=((8,16)))
+else:
+    fig = plt.figure(figsize=((8,12)))
+
 axs = fig.subplots(d)
 fig.suptitle('Gaussian (black), exact-H (blue), and ML-H (red) propagation results',y=0.9)
 ctr = 0
 mylabels = []
 for ij in nzreals:
-    axs[ctr].plot(onp.real(EXsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
-    axs[ctr].plot(onp.real(MLsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
-    axs[ctr].plot(onp.real(denMO[offset:intpts,ij[0],ij[1]]), 'k-')
+    axs[ctr].plot(tvec, onp.real(EXsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
+    axs[ctr].plot(tvec, onp.real(MLsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
+    axs[ctr].plot(tvec, onp.real(denMO[offset:intpts,ij[0],ij[1]]), 'k-')
     ijprime = (ij[0]+1, ij[1]+1)
     thislabel = 'Re(P_' + str(ijprime) + ')'
     mylabels.append(thislabel)
     ctr += 1
 
 for ij in nzimags:
-    axs[ctr].plot(onp.imag(EXsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
-    axs[ctr].plot(onp.imag(MLsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
-    axs[ctr].plot(onp.imag(denMO[offset:intpts,ij[0],ij[1]]), 'k-')
+    axs[ctr].plot(tvec, onp.imag(EXsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
+    axs[ctr].plot(tvec, onp.imag(MLsol.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
+    axs[ctr].plot(tvec, onp.imag(denMO[offset:intpts,ij[0],ij[1]]), 'k-')
     ijprime = (ij[0]+1, ij[1]+1)
     thislabel = 'Im(P_' + str(ijprime) + ')'
     mylabels.append(thislabel)
@@ -380,7 +405,7 @@ fielddenMOnodup = fielddenMOnodupflat.reshape((-1,drc,drc))
 print(fielddenMOnodup.shape)
 
 # propagate forward in time using ML ham with field
-intpts = 1000
+intpts = 2000
 tvec = dt*onp.arange(intpts-offset)
 print(tvec[-1])
 initcond = onp.array(fielddenMOnodupflat[offset,:])
@@ -403,24 +428,36 @@ tdmlHamerr = onp.linalg.norm( MLsolwf.y.T.reshape((-1,drc,drc)) - fielddenMOnodu
 tdexmlerr = onp.linalg.norm( EXsolwf.y.T.reshape((-1,drc,drc)) - MLsolwf.y.T.reshape((-1,drc,drc)) , axis=(1,2))
 onp.savez(savepath+mol+'tdHamerrWF.npz',tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
 
-fig = plt.figure(figsize=((8,36)))
-axs = fig.subplots(d)
-fig.suptitle('Gaussian (black), exact-H (blue), and ML-H (red) propagation results',y=0.9)
-ctr = 0
 mylabels = []
+if mol == 'lih':
+    fig = plt.figure(figsize=((8,16)))
+    fig.suptitle('Gaussian (black), exact-H (blue), and ML-H (red) propagation results',y=0.9)
+    axs = fig.subplots(d)
+    ctr = 0
+else:
+    fig = plt.figure(figsize=((8,12)))
+    fig.suptitle('Gaussian (black), exact-H (blue), and ML-H (red) propagation results',y=0.9)
+    axs = fig.subplots(d+1)
+    trueefield = 0.05*onp.sin(0.0428*tvec)
+    trueefield[1776:] = 0.
+    axs[0].plot(tvec, trueefield, 'k-')
+    thislabel = 'E-field'
+    mylabels.append(thislabel)
+    ctr = 1
+
 for ij in nzreals:
-    axs[ctr].plot(onp.real(EXsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
-    axs[ctr].plot(onp.real(MLsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
-    axs[ctr].plot(onp.real(fielddenMOnodup[offset:intpts,ij[0],ij[1]]), 'k-')
+    axs[ctr].plot(tvec, onp.real(EXsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
+    axs[ctr].plot(tvec, onp.real(MLsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
+    axs[ctr].plot(tvec, onp.real(fielddenMOnodup[offset:intpts,ij[0],ij[1]]), 'k-')
     ijprime = (ij[0]+1, ij[1]+1)
     thislabel = 'Re(P_' + str(ijprime) + ')'
     mylabels.append(thislabel)
     ctr += 1
 
 for ij in nzimags:
-    axs[ctr].plot(onp.imag(EXsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
-    axs[ctr].plot(onp.imag(MLsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
-    axs[ctr].plot(onp.imag(fielddenMOnodup[offset:intpts,ij[0],ij[1]]), 'k-')
+    axs[ctr].plot(tvec, onp.imag(EXsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'b-')
+    axs[ctr].plot(tvec, onp.imag(MLsolwf.y.T.reshape((-1,drc,drc))[:,ij[0],ij[1]]), 'r-')
+    axs[ctr].plot(tvec, onp.imag(fielddenMOnodup[offset:intpts,ij[0],ij[1]]), 'k-')
     ijprime = (ij[0]+1, ij[1]+1)
     thislabel = 'Im(P_' + str(ijprime) + ')'
     mylabels.append(thislabel)

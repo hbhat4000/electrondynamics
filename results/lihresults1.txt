@@ -79,4 +79,9 @@ hamimags:
 {(0, 1): 10, (0, 4): 11, (1, 4): 12, (0, 5): 13, (1, 5): 14, (4, 5): 15}
 hamdof:  16
 nump:  17
-Training loss:  3.1347619621884317e-06
+weights:
+[1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+Training loss:  2.298545411771273e-06
+|| Grad(loss) || at theta:  6.472727310939089e-10
+New training fits:
+New validation fits:

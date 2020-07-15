@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as onp
 import scipy.integrate as si
 
-mol = 'c2h4'
+mol = 'lih'
 savepath = './'+mol+'LINEAR/'
 rawden = onp.load('./td_dens_re+im_rt-tdexx_delta_s0_'+mol+'_sto-3g.npz',allow_pickle=True)
 
@@ -184,7 +184,11 @@ dt = 0.08268
 npts = x_inp.shape[0]
 tint_whole = np.arange(npts)*dt
 
-ntrain = 2000
+if mol == 'c2h4':
+    ntrain = 2000
+else:
+    ntrain = 1000
+
 nvalid = npts - ntrain
 
 x_inp_train = x_inp[:ntrain,:]
