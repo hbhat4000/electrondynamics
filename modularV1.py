@@ -37,9 +37,8 @@ class LearnHam:
             
         # store the path to output files, i.e., saved research outputs like figures
         self.outpath = outpath
-
     # load and process field-free data
-    def load(self, inpath):
+    def load(self,inpath):
         # store the path to input files, i.e., training data, auxiliary matrices, etc
         inpath = inpath
         rawden = onp.load(inpath + 'td_dens_re+im_rt-tdexx_delta_s0_'+mol+'_sto-3g.npz',allow_pickle=True)
@@ -55,11 +54,21 @@ class LearnHam:
         self.sevals, self.sevecs = onp.linalg.eigh(s)
         self.xmat = self.sevecs @ onp.diag(self.sevals**(-0.5))
         
+        
         # remove duplicates
         realpt = rawden['td_dens_re_data']
         imagpt = rawden['td_dens_im_data']
         den = realpt + 1j*imagpt
         self.drc = den.shape[1]
+        # Read dipole data
+        self.didat = [[]]*3
+        self.didat[0] = onp.zeros(shape=(self.drc,self.drc))
+        self.didat[1] = onp.zeros(shape=(self.drc,self.drc))
+        self.didat[2] = onp.zeros(shape=(self.drc,self.drc))
+        self.didat[0] = overlap['dipx_data']
+        self.didat[1] = overlap['dipy_data']
+        self.didat[2] = overlap['dipz_data']
+        print('dipole',self.didat[2])
         denflat = den.reshape((-1,self.drc**2))
         dennodupflat = onp.array([onp.delete(denflat[:,i], onp.s_[101::100]) for i in range(self.drc**2)]).T
         self.denAO = dennodupflat.reshape((-1,self.drc,self.drc))
@@ -124,49 +133,10 @@ class LearnHam:
         return True
     
     # load and process data with field
-    def loadfield(self, inpath):
-        fielddata = onp.load(inpath + './td_efield+dipole_rt-tdexx_ndlaser1cycs0_'+mol+'_sto-3g.npz')
+    def loadfield(self,inpath):
+        fielddata = onp.load(inpath + 'td_efield+dipole_rt-tdexx_ndlaser1cycs0_'+mol+'_sto-3g.npz')
         self.efdat = fielddata['td_efield_data']
-
-        # in the future, it would be best to read these from files
-        # i couldn't get this to work in July -- perhaps the files have been fixed now?
-        self.didat = [[]]*3
-        self.didat[0] = onp.zeros((self.drc, self.drc))
-        self.didat[1] = onp.zeros((self.drc, self.drc))
-
-        if mol == 'heh+':
-            self.didat[2] = onp.array([[-0.729434, 0.0734846], [ 0.0734846, 0.729434 ]])
-
-        elif mol == 'h2':
-            self.didat[2] = onp.array([[-0.699199, 0.0], [0.0, 0.699199]])
-
-        elif mol == 'lih':
-            self.didat[2] =  onp.array([[-0.144564e1, 0., 0., 0., 0., 0.],
-                        [0.698659e-01, 0.144564e+01, 0., 0., 0., 0.],
-                        [-0.341601, 0.348597, 0.144564e01, 0., 0., 0.],
-                        [0., 0., 0., 0.144564e+01, 0., 0.],
-                        [0., 0., 0., 0., 0.144564e+01, 0.],
-                        [0.667143, 0.147240, 0.180330e+01, 0., 0., 0.144564e+01]])
-            self.didat[2] += onp.tril(self.didat[2], k=-1).T
-
-        elif mol == 'c2h4':
-            self.didat[2] = onp.array([[0.126517e1,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0.314221, 0.126517e1, 0,0,0,0,0,0,0,0,0,0,0,0],
-            [0.,0.,0.126517e1 ,0,0,0,0,0,0,0,0,0,0,0],
-            [0.,0.,0.,0.126517e1 ,0,0,0,0,0,0,0,0,0,0],
-            [0.718555e-01,  0.838744,  0., 0., 0.126517e1, 0,0,0,0,0,0,0,0,0],
-            [0., -0.490823e-01, 0., 0., 0.813421e-01, -0.126517e1, 0,0,0,0,0,0,0,0],
-            [0.490823e-01, 0., 0., 0., 0.244692, -0.314221, -0.126517e1, 0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0, -0.126517e1, 0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,-0.126517e1, 0,0,0,0,0],
-            [0.813421e-01,  0.244692,  0,0,0,  0.718555e-01,  0.838744, 0., 0., -0.126517e1, 0,0,0,0],
-            [0.838104e-01,  0.898824,  0, 0.724971,  0.794395, -0.681175e-02, 0.463892e-01,0.,0.247053e-01, 0.125735, 0.232833e+01, 0.,0.,0.],
-            [0.838104e-01,  0.898824,  0., -0.724971,  0.794395, -0.681175e-02,  0.463892e-01, 0., -0.247053e-01, 0.125735, 0.348982,  0.232833e1, 0.,0.],
-            [0.681175e-02, -0.463892e-01, 0., -0.247053e-01,  0.125735, -0.838104e-01, -0.898824,  0., -0.724971,  0.794395, 0.,  0., -0.232833e1, 0.],
-            [0.681175e-02, -0.463892e-01, 0., 0.247053e-01,  0.125735, -0.838104e-01, -0.898824,  0.,  0.724971,  0.794395, 0.,  0., -0.348982, -0.232833e1]])
-            self.didat[2] += onp.tril(self.didat[2], k=-1).T
-        
-        fielddens = onp.load(inpath + './td_dens_re+im_rt-tdexx_ndlaser1cycs0_'+mol+'_sto-3g.npz',allow_pickle=True)
+        fielddens = onp.load(inpath + 'td_dens_re+im_rt-tdexx_ndlaser1cyc_s0_'+mol+'_sto-3g.npz',allow_pickle=True)
         self.fieldden = fielddens['td_dens_re_data'] + 1j*fielddens['td_dens_im_data']
 
         # change basis from AO to orthogonalization of AO (called MO here)
@@ -674,10 +644,10 @@ class LearnHam:
 
 
 if __name__ == '__main__':
-    mol = 'lih'
+    mol = 'heh+'
     mlham = LearnHam(mol,'./'+mol+'LINEAR/')
-    mlham.load('./')
-    mlham.loadfield('./')
+    mlham.load('/Users/prachigupta/ml_tddft/scripts/data/heh+/sto-3g/extracted_data/')
+    mlham.loadfield('/Users/prachigupta/ml_tddft/scripts/data/heh+/sto-3g/extracted_data/')
     mlham.trainsplit()
     mlham.buildmodel()
     print(mlham.rgmmat.shape)
