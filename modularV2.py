@@ -56,14 +56,14 @@ class LearnHam:
     def load(self,inpath):
         # store the path to input files, i.e., training data, auxiliary matrices, etc
         inpath = inpath
-        rawden = np.load(inpath + 'td_dens_re+im_rt-tdexx_delta_s0_'+mol+'_sto-3g.npz',allow_pickle=True)
-        overlap = np.load(inpath + 'ke+en+overlap+ee_twoe+dip_hf_delta_s0_'+mol+'_sto-3g.npz',allow_pickle=True)
+        rawden = np.load(inpath + 'td_dens_re+im_rt-tdexx_delta_s0_'+self.mol+'_sto-3g.npz',allow_pickle=True)
+        overlap = np.load(inpath + 'ke+en+overlap+ee_twoe+dip_hf_delta_s0_'+self.mol+'_sto-3g.npz',allow_pickle=True)
 
         # put things into better variables
         self.kinmat = overlap['ke_data']
         self.enmat = overlap['en_data']
         self.eeten = overlap['ee_twoe_data']
-
+        
         # need these for orthogonalization below
         s = overlap['overlap_data']
         self.sevals, self.sevecs = np.linalg.eigh(s)
@@ -146,14 +146,24 @@ class LearnHam:
             self.nzrow[i] = self.allnzs[i][0]
             self.nzcol[i] = self.allnzs[i][1]
         
+        # create a matrix that can be used for fast evaluation of exact Coulomb and exchange terms
+        self.eemat = np.zeros((self.drc**2,self.drc**2), dtype=np.complex128)
+        for a in range(self.drc**2):
+            for b in range(self.drc**2):
+                u = a//self.drc
+                v = a%self.drc
+                l = b//self.drc
+                s = b%self.drc
+                self.eemat[a,b] = 2*self.eeten[u,v,l,s] - self.eeten[u,l,v,s]
+
         # show that we got here
         return True
     
     # load and process data with field
     def loadfield(self,inpath):
-        fielddata = np.load(inpath + 'td_efield+dipole_rt-tdexx_ndlaser1cycs0_'+mol+'_sto-3g.npz')
+        fielddata = np.load(inpath + 'td_efield+dipole_rt-tdexx_ndlaser1cycs0_'+self.mol+'_sto-3g.npz')
         self.efdat = fielddata['td_efield_data']
-        fielddens = np.load(inpath + 'td_dens_re+im_rt-tdexx_ndlaser1cycs0_'+mol+'_sto-3g.npz',allow_pickle=True)
+        fielddens = np.load(inpath + 'td_dens_re+im_rt-tdexx_ndlaser1cycs0_'+self.mol+'_sto-3g.npz',allow_pickle=True)
         self.fieldden = fielddens['td_dens_re_data'] + 1j*fielddens['td_dens_im_data']
 
         # change basis from AO to orthogonalization of AO (called MO here)
@@ -553,11 +563,18 @@ class LearnHam:
     # compute and plot error between ML and true Hamiltonians on training set
     def plottrainhamerr(self):
         # this calculates the true Hamiltonian in the AO basis
-        trueham = np.zeros((self.myham.shape[0],self.drc,self.drc), dtype=np.complex128)
-        for i in range(self.myham.shape[0]):
-            twoe = self.get_ee_onee_AO(self.denAO[i,:,:])
-            tot = self.kinmat - self.enmat + twoe
-            trueham[i,:,:] = tot
+        #trueham = np.zeros((self.myham.shape[0],self.drc,self.drc), dtype=np.complex128)
+        #for i in range(self.myham.shape[0]):
+        #    twoe = self.get_ee_onee_AO(self.denAO[i,:,:])
+        #    tot = self.kinmat - self.enmat + twoe
+        #    trueham[i,:,:] = tot
+            
+        truehamalt = np.einsum('jk,ik->ij',self.eemat,self.denAO.reshape((-1,self.drc**2)))
+        truehamalt += (self.kinmat - self.enmat).reshape((-1,self.drc**2))
+        truehamalt = truehamalt.reshape((-1,self.drc,self.drc))
+        trueham = truehamalt[:self.myham.shape[0],:,:]
+        #print('Testing truehamalt:')
+        #print(np.sum(np.abs(trueham - truehamalt[:self.myham.shape[0],:,:])))
 
         truehamMO = np.zeros(trueham.shape,dtype=np.complex128)
         npts = trueham.shape[0]
@@ -582,7 +599,8 @@ class LearnHam:
         p = pin.reshape(self.drc,self.drc)
         
         pAO = self.xmat @ p @ self.xmat.conj().T
-        twoe = self.get_ee_onee_AO(pAO)
+        # twoe = self.get_ee_onee_AO(pAO)
+        twoe = (self.eemat @ pAO.reshape((-1))).reshape(self.drc,self.drc)
         hAO = np.array(self.kinmat - self.enmat, dtype=np.complex128) + twoe
         h = -self.xmat.conj().T @ hAO @ self.xmat
 
@@ -628,7 +646,8 @@ class LearnHam:
 
         p = pin.reshape(self.drc,self.drc)
         pAO = self.xmat @ p @ self.xmat.conj().T
-        twoe = self.get_ee_onee_AO(pAO)
+        # twoe = self.get_ee_onee_AO(pAO)
+        twoe = (self.eemat @ pAO.reshape((-1))).reshape(self.drc,self.drc)
         
         hAO = (np.array(self.kinmat - self.enmat, dtype=np.complex128) + twoe) + self.fieldsign * hfieldAO
         h = -self.xmat.conj().T @ hAO @ self.xmat
@@ -701,7 +720,7 @@ class LearnHam:
         tdmlHamerr = np.linalg.norm( traj1.T.reshape((-1,self.drc,self.drc)) - groundtruth[self.offset:self.intpts,:,:] , axis=(1,2))
         tdexmlerr = np.linalg.norm( traj2.T.reshape((-1,self.drc,self.drc)) - traj1.T.reshape((-1,self.drc,self.drc)) , axis=(1,2))
         
-        np.savez(self.outpath +mol+ fname,tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
+        np.savez(self.outpath +self.mol+ fname,tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
         return errors
 
     # think of traj1 and traj2 as two different numerical solutions that we got by running propagate
@@ -758,7 +777,7 @@ class LearnHam:
         for ax in axs.flat:
             ax.label_outer()
         
-        fig.savefig(self.outpath + mol + fname)
+        fig.savefig(self.outpath + self.mol + fname)
         plt.close()
         return True
 
@@ -1038,7 +1057,7 @@ def computehess(lh):
     return hessmat
 
 if __name__ == '__main__':
-    mol = 'lih'
+    mol = 'c2h4'
     mlham = LearnHam(mol,'./'+mol+'LINEAR/')
     mlham.load('./data/')
     mlham.loadfield('./data/')
