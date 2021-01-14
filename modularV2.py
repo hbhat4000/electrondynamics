@@ -27,10 +27,13 @@ threadkeys = ['OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'VEC
 class LearnHam:
 
     # class initializer
-    def __init__(self, mol, outpath):
+    def __init__(self, mol, basis, outpath):
         
         # store the short string that indicates which molecule we're working on
         self.mol = mol
+
+        # store the short string that indicates which basis set we're using
+        self.basis = basis
         
         # field sign correction
         if self.mol == 'h2':
@@ -56,8 +59,8 @@ class LearnHam:
     def load(self,inpath):
         # store the path to input files, i.e., training data, auxiliary matrices, etc
         inpath = inpath
-        rawden = np.load(inpath + 'td_dens_re+im_rt-tdexx_delta_s0_'+mol+'_6-31g.npz',allow_pickle=True)
-        overlap = np.load(inpath + 'ke+en+overlap+ee_twoe+dip_hf_delta_s0_'+mol+'_6-31g.npz',allow_pickle=True)
+        rawden = np.load(inpath + 'td_dens_re+im_rt-tdexx_delta_s0_'+self.mol+'_'+self.basis+'.npz',allow_pickle=True)
+        overlap = np.load(inpath + 'ke+en+overlap+ee_twoe+dip_hf_delta_s0_'+self.mol+'_'+self.basis+'.npz',allow_pickle=True)
 
         # put things into better variables
         self.kinmat = overlap['ke_data']
@@ -151,9 +154,9 @@ class LearnHam:
     
     # load and process data with field
     def loadfield(self,inpath):
-        fielddata = np.load(inpath + 'td_efield+dipole_rt-tdexx_ndlaser1cycs0_'+mol+'_6-31g.npz')
+        fielddata = np.load(inpath + 'td_efield+dipole_rt-tdexx_ndlaser1cycs0_'+self.mol+'_'+self.basis+'.npz')
         self.efdat = fielddata['td_efield_data']
-        fielddens = np.load(inpath + 'td_dens_re+im_rt-tdexx_ndlaser1cycs0_'+mol+'_6-31g.npz',allow_pickle=True)
+        fielddens = np.load(inpath + 'td_dens_re+im_rt-tdexx_ndlaser1cycs0_'+self.mol+'_'+self.basis+'.npz',allow_pickle=True)
         self.fieldden = fielddens['td_dens_re_data'] + 1j*fielddens['td_dens_im_data']
 
         # change basis from AO to orthogonalization of AO (called MO here)
@@ -446,12 +449,12 @@ class LearnHam:
         theta0 = np.zeros(self.lentheta)        
         
         # solve least squares minimization problem
-        #self.theta,_,_,_ = sl.lstsq(self.hess, -self.grad, lapack_driver='gelsy')
+        self.theta,_,_,_ = sl.lstsq(self.hess, -self.grad, lapack_driver='gelsy')
         #
-        print("Computing regularization path using the LARS ...")
-        resid = (1J)*self.denMO_train_dot - (1J)*self.newpred(theta0)
-        alphas, _, coefs = linear_model.lars_path(self.jac, -resid.reshape(-1,1), method='lasso',verbose= True,alpha_min=-1)
-        self.theta = coefs.T[-1]
+        # print("Computing regularization path using the LARS ...")
+        # resid = (1J)*self.denMO_train_dot - (1J)*self.newpred(theta0)
+        # alphas, _, coefs = linear_model.lars_path(self.jac, -resid.reshape(-1,1), method='lasso',verbose= True,alpha_min=-1)
+        # self.theta = coefs.T[-1]
         
         # save training loss
         self.trainloss = self.newloss(self.theta)
@@ -706,7 +709,7 @@ class LearnHam:
         tdmlHamerr = np.linalg.norm( traj1.T.reshape((-1,self.drc,self.drc)) - groundtruth[self.offset:self.intpts,:,:] , axis=(1,2))
         tdexmlerr = np.linalg.norm( traj2.T.reshape((-1,self.drc,self.drc)) - traj1.T.reshape((-1,self.drc,self.drc)) , axis=(1,2))
         
-        np.savez(self.outpath +mol+ fname,tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
+        np.savez(self.outpath +self.mol+ fname,tdexHamerr=tdexHamerr,tdmlHamerr=tdmlHamerr,tdexmlerr=tdexmlerr)
         return errors
 
     # think of traj1 and traj2 as two different numerical solutions that we got by running propagate
@@ -763,7 +766,7 @@ class LearnHam:
         for ax in axs.flat:
             ax.label_outer()
         
-        fig.savefig(self.outpath + mol + fname)
+        fig.savefig(self.outpath + self.mol + fname)
         plt.close()
         return True
 
@@ -1043,10 +1046,13 @@ def computehess(lh):
     return hessmat
 
 if __name__ == '__main__':
-    mol = 'lih'
-    mlham = LearnHam(mol,'./'+mol+'LINEAR_6-31G/')
-    mlham.load('../../6-31G/lih/')
-    mlham.loadfield('../../6-31G/lih/')
+    mymol = 'h2'
+    mlham = LearnHam(mymol, 'sto-3g', './temp/')
+    mlham.load('./data/')
+    mlham.loadfield('./data/')
+    # mlham = LearnHam(mymol,'./'+mymol+'LINEAR_6-31G/')
+    # mlham.load('../../6-31G/lih/')
+    # mlham.loadfield('../../6-31G/lih/')
     mlham.trainsplit()
     mlham.buildmodel()
     
@@ -1056,13 +1062,13 @@ if __name__ == '__main__':
     mlham.setgrad(mygrad)
 
     # function outside LearnHam class that computes the Jacobian
-    myjac = computejac(mlham)
+    # myjac = computejac(mlham)
     # set the Jacobian inside the object 
-    mlham.setjac(myjac)
+    # mlham.setjac(myjac)
 
     # if you've already computed the Jacobian, you can obtain the Hessian
     # using the following beautiful formula
-    hess2 = 2.0*np.conj(myjac.T) @ myjac
+    # hess2 = 2.0*np.conj(myjac.T) @ myjac
     
     # function outside LearnHam class that computes the Hessian
     # does not need and does not compute either the gradient or the Jacobian
@@ -1070,12 +1076,14 @@ if __name__ == '__main__':
     # set the Hessian inside the object
     mlham.sethess(hess)
 
-    print('difference between two ways to compute Hessian:')
-    print(np.linalg.norm(hess - hess2))
+    # print('difference between two ways to compute Hessian:')
+    # print(np.linalg.norm(hess - hess2))
     print('******')
 
     mlham.trainmodel()
+    print("Training loss:")
     print(mlham.trainloss)
+    print("Gradient of training loss:")
     print(mlham.gradloss)
     
     mlham.plottrainfits()
@@ -1092,8 +1100,9 @@ if __name__ == '__main__':
     # quantitatively and graphically compare the trajectories we just obtained against denMO
     # bigger figure for LiH
     err = mlham.quantcomparetraj(MLsol, EXsol, mlham.denMO)
+    print("Field-off propagation error:")
     print(err)
-    if mol == 'lih':
+    if mymol == 'lih':
         fs = (8,16)
     else:
         fs = (8,12)
@@ -1108,8 +1117,9 @@ if __name__ == '__main__':
     # quantitatively and graphically compare the trajectories we just obtained against denMO
     # bigger figure for LiH
     errWF = mlham.quantcomparetraj(MLsolWF, EXsolWF, mlham.fielddenMO, 'tdHamerrWF.npz')
+    print("Field-on propagation error:")
     print(errWF)
-    if mol == 'lih':
+    if mymol == 'lih':
         fs = (8,16)
         infl = False
     else:
