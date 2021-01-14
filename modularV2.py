@@ -769,7 +769,74 @@ class LearnHam:
         fig.savefig(self.outpath + self.mol + fname)
         plt.close()
         return True
-
+        
+    def fastthd(self, imagflag=False):
+        thd = np.zeros((self.drc,self.drc,self.drc,self.drc), dtype=np.complex128)
+        ssevecs = self.sevecs @ np.diag(self.sevals**(-0.5))
+        for a in range(self.drc):
+            for b in range(self.drc):
+                for r in range(self.drc):
+                    for z in range(self.drc):
+                        testelt = np.outer( self.xmat[:,[a]] @ ssevecs[:,[r]].T, ssevecs[:,[z]] @ self.xmat[:,[b]].T )
+                        testelt = testelt.reshape((self.drc,self.drc,self.drc,self.drc))
+                        testelt = np.swapaxes(np.swapaxes(testelt, 1, 3), 2, 3)
+                        if imagflag:
+                            testelt *= self.myeeten2
+                        else:
+                            testelt *= self.myeeten
+                        thd[a,b,r,z] += np.sum(testelt)
+        if imagflag:
+            return -thd
+        else:
+            return thd
+    
+    def computetruetheta(self):
+        self.myeeten = np.zeros((self.drc,self.drc,self.drc,self.drc))
+        self.myeeten2 = np.zeros((self.drc,self.drc,self.drc,self.drc))
+        for u in range(self.drc):
+            for v in range(self.drc):
+                for l in range(self.drc):
+                    for s in range(self.drc):
+                        if u <= v:
+                            self.myeeten[u,v,l,s] = 2*self.eeten[u,v,l,s] - self.eeten[u,l,v,s]
+                            self.myeeten2[u,v,l,s] = -2*self.eeten[u,v,l,s] + self.eeten[u,l,v,s]
+                        else:
+                            self.myeeten[u,v,l,s] = 2*self.eeten[v,u,l,s] - self.eeten[v,l,u,s]
+                            self.myeeten2[u,v,l,s] = 2*self.eeten[v,u,l,s] - self.eeten[v,l,u,s]
+        
+        self.truethetaR = np.zeros((self.nhamreals+1, self.nhamreals))
+        constpart = self.xmat.conj().T @ (self.kinmat - self.enmat) @ self.xmat
+        cnt = 0
+        for ij in self.nzreals:
+            self.truethetaR[0,cnt] = -np.real(constpart[ij[0], ij[1]])
+            cnt += 1
+        
+        self.truethetaI = np.zeros((self.nhamimags, self.nhamimags))
+        realthd = np.real(self.fastthd())
+        imagthd = np.real(self.fastthd(True))
+        row = 1
+        col = 0
+        for kl in self.nzreals:
+            for ij in self.nzreals:
+                if kl[0]==kl[1]:
+                    self.truethetaR[row, col] = -realthd[ij[0],ij[1],kl[0],kl[1]]
+                else:
+                    self.truethetaR[row, col] = -realthd[ij[0],ij[1],kl[0],kl[1]] - realthd[ij[0],ij[1],kl[1],kl[0]]
+                col += 1
+            col = 0
+            row += 1
+        
+        row = 0
+        col = 0
+        for kl in self.nzimags:
+            for ij in self.nzimags:
+                self.truethetaI[row, col] = -imagthd[ij[0],ij[1],kl[0],kl[1]] + imagthd[ij[0],ij[1],kl[1],kl[0]]
+                col += 1
+            col = 0
+            row += 1
+        
+        self.truethetaflat = np.concatenate([self.truethetaR.reshape((-1)), self.truethetaI.reshape((-1))])
+        return True
 
 # this function is intended to be called by either map or a multiprocessing variant of map
 def gradone(tu):
@@ -1050,9 +1117,6 @@ if __name__ == '__main__':
     mlham = LearnHam(mymol, 'sto-3g', './temp/')
     mlham.load('./data/')
     mlham.loadfield('./data/')
-    # mlham = LearnHam(mymol,'./'+mymol+'LINEAR_6-31G/')
-    # mlham.load('../../6-31G/lih/')
-    # mlham.loadfield('../../6-31G/lih/')
     mlham.trainsplit()
     mlham.buildmodel()
     
@@ -1126,4 +1190,11 @@ if __name__ == '__main__':
         fs = (8,12)
         infl = True
     mlham.graphcomparetraj(MLsolWF, EXsolWF, mlham.fielddenMO, fs, infl, 'propWF.pdf')
+
+    # compute true theta
+    mlham.computetruetheta()
+    print("True theta:")
+    print(mlham.truethetaflat)
+    print("Loss when we plug in true theta:")
+    print(mlham.newloss(mlham.truethetaflat))
 
