@@ -1,8 +1,7 @@
 # object-oriented Python code
 # 1) analytical gradient and Hessian
 # 2) single trajectory
-# 3) Hamiltonian real depends on real and imag depends on imag
-# 4) Hamiltonian has zeros in locations where density matrices have zeros; all other DOFs are active
+# 3) Hamiltonian real depends on real and imag depends on imag # 4) Hamiltonian has zeros in locations where density matrices have zeros; all other DOFs are active
 # 5) least squares training
 
 import matplotlib
@@ -656,26 +655,35 @@ class LearnHam:
         return THISsol.y
     
     # Andrew's method, rewritten slightly so that it does not rely on anything defined in propagate
-    def MMUT_Prop(self, hamfunc, initial_density, intpts=2000, field=False):
+    def MMUT_Prop(self, hamfunc, initial_density, intpts=2000, field=False, dilfac=1):
         self.intpts = intpts
         ntvec = intpts-self.offset
         self.tvec = self.dt*np.arange(ntvec)
+        # set the dt of the code equal to dt of the data / dilation factor
+        dt = self.dt/dilfac
         propagated_dens = np.zeros((self.drc**2,ntvec), dtype=np.complex128)
         propagated_dens[:,0] = initial_density
-        for i in range(ntvec-1):
+        for i in range(dilfac*ntvec-1):
             if i == 0:
                 P_n_min_12 = initial_density.reshape((self.drc, self.drc))  # keep as a matrix
-                h = hamfunc(i*self.dt, P_n_min_12, field)                   # returns a matrix
+                h = hamfunc(i*dt, P_n_min_12, field)                        # returns a matrix
                 tdhfrhs = (h @ P_n_min_12 - P_n_min_12 @ h)/(1j)            # also a matrix
-                P_n = P_n_min_12 + 0.5*self.dt*tdhfrhs                      # matrix equation
-                F_n = hamfunc(i*self.dt, P_n, field)                        # still a matrix!
+                P_n = P_n_min_12 + 0.5*dt*tdhfrhs                           # matrix equation
             else:
                 P_n_min_12 = P_n_plus_12
-                F_n = hamfunc(i*self.dt, P_n_plus_1, field)
+                P_n = P_n_plus_1
 
-            P_n_plus_12 = sl.expm(-1j*self.dt*F_n) @ P_n_min_12 @ sl.expm(1j*self.dt*F_n)
-            propagated_dens[:,i+1] = P_n_plus_12.reshape((self.drc**2))     # flatten only to store
-            P_n_plus_1 = sl.expm(-1j*self.dt/2*F_n) @  P_n_plus_12 @ sl.expm(1j*self.dt/2*F_n)
+            F_n = hamfunc(i*dt, P_n, field)                                 # still a matrix!
+            # U = sl.expm(-1j*dt*F_n)
+            lamb, vmat = sl.eigh(F_n)
+            U = vmat @ np.diag(np.exp(-1j*dt*lamb)) @ vmat.conj().T
+            P_n_plus_12 = U @ P_n_min_12 @ U.conj().T
+            if (i+1) % dilfac == 0:
+                ii = (i+1)//dilfac
+                propagated_dens[:,ii] = P_n_plus_12.reshape((self.drc**2)) # flatten only to store
+            # Uprime = sl.expm(-1j*(dt/2.0)*F_n)
+            Uprime = vmat @ np.diag(np.exp(-1j*(dt/2.0)*lamb)) @ vmat.conj().T
+            P_n_plus_1 = Uprime @  P_n_plus_12 @ Uprime.conj().T
 
         return propagated_dens
 
@@ -1148,7 +1156,7 @@ if __name__ == '__main__':
 
     # propagate using ML Hamiltonian with no field
     # MLsol = mlham.propagate(mlham.MLham, mlham.denMOflat[mlham.offset,:], mytol=1e-9)
-    MLsol = mlham.MMUT_Prop(mlham.MLham, mlham.denMOflat[mlham.offset,:])
+    MLsol = mlham.MMUT_Prop(mlham.MLham, mlham.denMOflat[mlham.offset,:], dilfac=4)
     print(MLsol.shape)
 
     # propagate using Exact Hamiltonian with no field
@@ -1163,11 +1171,11 @@ if __name__ == '__main__':
         fs = (8,16)
     else:
         fs = (8,12)
-    mlham.graphcomparetraj(MLsol, EXsol, mlham.denMO, fs)
+    # mlham.graphcomparetraj(MLsol, EXsol, mlham.denMO, fs)
 
     # propagate using ML Hamiltonian with field
     # MLsolWF = mlham.propagate(mlham.MLham, mlham.fielddenMOflat[mlham.offset,:], mytol=1e-9, field=True)
-    MLsolWF = mlham.MMUT_Prop(mlham.MLham, mlham.denMOflat[mlham.offset,:], field=True)
+    MLsolWF = mlham.MMUT_Prop(mlham.MLham, mlham.fielddenMOflat[mlham.offset,:], field=True, dilfac=4)
     print(MLsolWF.shape)
     
     # propagate using Exact Hamiltonian with field
@@ -1184,12 +1192,12 @@ if __name__ == '__main__':
     else:
         fs = (8,12)
         infl = True
-    mlham.graphcomparetraj(MLsolWF, EXsolWF, mlham.fielddenMO, fs, infl, 'propWF.pdf')
+    # mlham.graphcomparetraj(MLsolWF, EXsolWF, mlham.fielddenMO, fs, infl, 'propWF.pdf')
 
     # compute true theta
     mlham.computetruetheta()
     print("True theta:")
-    print(mlham.truethetaflat)
+    # print(mlham.truethetaflat)
     print("Loss when we plug in true theta:")
     print(mlham.newloss(mlham.truethetaflat))
 
