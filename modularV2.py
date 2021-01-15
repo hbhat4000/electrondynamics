@@ -584,24 +584,42 @@ class LearnHam:
         plt.close()
         return True    
         
-    # EXACT deltakick Hamiltonian, NO FIELD
+    # EXACT deltakick Hamiltonian
     # this function is defined for propagation purposes
-    def EXhamrhs(self, t, pin):
-        p = pin.reshape(self.drc,self.drc)
-        
+    # this function takes in a scalar time, and a density *matrix* p (not flattened)
+    def EXham(self, t, p, field=False):        
         pAO = self.xmat @ p @ self.xmat.conj().T
         twoe = self.get_ee_onee_AO(pAO)
         hAO = np.array(self.kinmat - self.enmat, dtype=np.complex128) + twoe
+        if field:
+            freq = 0.0428
+            if t > 2*np.pi/freq:
+                ez = 0
+            elif t < 0:
+                ez = 0
+            else:
+                ez = 0.05*np.sin(0.0428*t)
+            hfieldAO = np.array(ez*self.didat[2], dtype=np.complex128)
+            hAO += self.fieldsign*hfieldAO
+        
         h = -self.xmat.conj().T @ hAO @ self.xmat
+        return h
+        # rhs = (h @ p - p @ h)/(1j)
+        # return rhs.reshape(self.drc**2)
 
-        rhs = (h @ p - p @ h)/(1j)
-        return rhs.reshape(self.drc**2)
-
+    # # Andrew's method
+    # def fock_build(self, pin):
+    #     p = pin.reshape(self.drc,self.drc)
+    #     pAO = self.xmat @ p @ self.xmat.conj().T
+    #     twoe = self.get_ee_onee_AO(pAO)
+    #     hAO = np.array(self.kinmat - self.enmat, dtype=np.complex128) + twoe
+    #     h = -self.xmat.conj().T @ hAO @ self.xmat
+    #     return h
+    
     # MACHINE LEARNED deltakick Hamiltonian, NO FIELD
     # this function is defined for propagation purposes
-    def MLhamrhs(self, t, pin):
-        p = pin.reshape(self.drc,self.drc)
-        
+    # this function takes in a scalar time, and a density *matrix* p (not flattened)
+    def MLham(self, t, p, field=False):
         # MACHINE LEARNED deltakick Hamiltonian
         pflat = np.zeros(self.ndof, dtype=np.complex128)
         for ij in self.nzreals:
@@ -618,84 +636,97 @@ class LearnHam:
             h[ij[0], ij[1]] += (1J)*hflat[self.hamimags[ij]]
             h[ij[1], ij[0]] -= (1J)*hflat[self.hamimags[ij]]
         
-        rhs = (h @ p - p @ h)/(1j)
-        return rhs.reshape(self.drc**2)
+        if field:
+            freq = 0.0428
+            if t > 2*np.pi/freq:
+                ez = 0
+            elif t < 0:
+                ez = 0
+            else:
+                ez = 0.05*np.sin(0.0428*t)
+
+            hfieldAO = np.array(ez*self.didat[2], dtype=np.complex128)
+            h -= self.fieldsign * self.xmat.conj().T @ hfieldAO @ self.xmat
+        
+        return h
+        # rhs = (h @ p - p @ h)/(1j)
+        # return rhs.reshape(self.drc**2)
 
     # EXACT deltakick Hamiltonian, WITH FIELD ON
     # this function is defined for propagation purposes
-    def EXhamwfrhs(self, t, pin):
-        freq = 0.0428
-        if t > 2*np.pi/freq:
-            ez = 0
-        elif t < 0:
-            ez = 0
-        else:
-            ez = 0.05*np.sin(0.0428*t)
+    # def EXhamwfrhs(self, t, pin):
+    #     freq = 0.0428
+    #     if t > 2*np.pi/freq:
+    #         ez = 0
+    #     elif t < 0:
+    #         ez = 0
+    #     else:
+    #         ez = 0.05*np.sin(0.0428*t)
 
-        hfieldAO = np.array(ez*self.didat[2], dtype=np.complex128)
+    #     hfieldAO = np.array(ez*self.didat[2], dtype=np.complex128)
 
-        p = pin.reshape(self.drc,self.drc)
-        pAO = self.xmat @ p @ self.xmat.conj().T
-        twoe = self.get_ee_onee_AO(pAO)
+    #     p = pin.reshape(self.drc,self.drc)
+    #     pAO = self.xmat @ p @ self.xmat.conj().T
+    #     twoe = self.get_ee_onee_AO(pAO)
         
-        hAO = (np.array(self.kinmat - self.enmat, dtype=np.complex128) + twoe) + self.fieldsign * hfieldAO
-        h = -self.xmat.conj().T @ hAO @ self.xmat
+    #     hAO = (np.array(self.kinmat - self.enmat, dtype=np.complex128) + twoe) + self.fieldsign * hfieldAO
+    #     h = -self.xmat.conj().T @ hAO @ self.xmat
 
-        rhs = (h @ p - p @ h)/(1j)
-        return rhs.reshape(self.drc**2)
+    #     rhs = (h @ p - p @ h)/(1j)
+    #     return rhs.reshape(self.drc**2)
 
     # MACHINE LEARNED deltakick Hamiltonian, WITH FIELD ON
     # this function is defined for propagation purposes
-    def MLhamwfrhs(self, t, pin):
-        freq = 0.0428
-        if t > 2*np.pi/freq:
-            ez = 0
-        elif t < 0:
-            ez = 0
-        else:
-            ez = 0.05*np.sin(0.0428*t)
+    # def MLhamwfrhs(self, t, pin):
+    #     freq = 0.0428
+    #     if t > 2*np.pi/freq:
+    #         ez = 0
+    #     elif t < 0:
+    #         ez = 0
+    #     else:
+    #         ez = 0.05*np.sin(0.0428*t)
 
-        hfieldAO = np.array(ez*self.didat[2], dtype=np.complex128)
+    #     hfieldAO = np.array(ez*self.didat[2], dtype=np.complex128)
 
-        p = pin.reshape(self.drc,self.drc)
+    #     p = pin.reshape(self.drc,self.drc)
 
-        # MACHINE LEARNED deltakick Hamiltonian
-        pflat = np.zeros(self.ndof, dtype=np.complex128)
-        for ij in self.nzreals:
-            pflat[self.nzreals[ij]] = np.real(p[ij[0], ij[1]])
-        for ij in self.nzimags:
-            pflat[self.nzimags[ij]] = np.imag(p[ij[0], ij[1]])
+    #     # MACHINE LEARNED deltakick Hamiltonian
+    #     pflat = np.zeros(self.ndof, dtype=np.complex128)
+    #     for ij in self.nzreals:
+    #         pflat[self.nzreals[ij]] = np.real(p[ij[0], ij[1]])
+    #     for ij in self.nzimags:
+    #         pflat[self.nzimags[ij]] = np.imag(p[ij[0], ij[1]])
 
-        hflat = np.matmul(self.rgm(pflat, t)[:,0], self.blocktheta(self.theta)) # + thtMOvec
-        h = np.zeros((self.drc,self.drc), dtype=np.complex128)
-        for ij in self.hamreals:
-            h[ij[0], ij[1]] = hflat[self.hamreals[ij]]
-            h[ij[1], ij[0]] = hflat[self.hamreals[ij]]
-        for ij in self.hamimags:
-            h[ij[0], ij[1]] += (1J)*hflat[self.hamimags[ij]]
-            h[ij[1], ij[0]] -= (1J)*hflat[self.hamimags[ij]]
+    #     hflat = np.matmul(self.rgm(pflat, t)[:,0], self.blocktheta(self.theta)) # + thtMOvec
+    #     h = np.zeros((self.drc,self.drc), dtype=np.complex128)
+    #     for ij in self.hamreals:
+    #         h[ij[0], ij[1]] = hflat[self.hamreals[ij]]
+    #         h[ij[1], ij[0]] = hflat[self.hamreals[ij]]
+    #     for ij in self.hamimags:
+    #         h[ij[0], ij[1]] += (1J)*hflat[self.hamimags[ij]]
+    #         h[ij[1], ij[0]] -= (1J)*hflat[self.hamimags[ij]]
         
-        h -= self.fieldsign * self.xmat.conj().T @ hfieldAO @ self.xmat
-        rhs = (h @ p - p @ h)/(1j)
-        return rhs.reshape(self.drc**2)
+    #     h -= self.fieldsign * self.xmat.conj().T @ hfieldAO @ self.xmat
+    #     rhs = (h @ p - p @ h)/(1j)
+    #     return rhs.reshape(self.drc**2)
     
     # propagate one method forward in time from self.offset to intpts = "integration points"
     # use initial condition given by initcond
     # use RK45 integration with relative and absolute tolerances set to mytol
-    def propagate(self, rhsfunc, initcond, intpts=2000, mytol=1e-12):
+    def propagate(self, hamfunc, initcond, intpts=2000, mytol=1e-12, field=False):
         self.intpts = intpts
         self.tvec = self.dt*np.arange(intpts-self.offset)
+
+        # this function takes in a scalar time and a flattened density
+        # it returns a flattened right-hand side of the TDHF equation
+        def rhsfunc(t, pin):
+            p = pin.reshape(self.drc,self.drc)
+            h = hamfunc(p)
+            rhs = (h @ p - p @ h)/(1j)
+            return rhs.reshape(self.drc**2)
+
         THISsol = si.solve_ivp(rhsfunc, [0, self.tvec[-1]], initcond, 'RK45', t_eval = self.tvec, rtol=mytol, atol=mytol)
         return THISsol.y
-
-    # Andrew's method
-    def fock_build(self,pin):
-        p = pin.reshape(self.drc,self.drc)
-        pAO = self.xmat @ p @ self.xmat.conj().T
-        twoe = self.get_ee_onee_AO(pAO)
-        hAO = np.array(self.kinmat - self.enmat, dtype=np.complex128) + twoe
-        h = -self.xmat.conj().T @ hAO @ self.xmat
-        return h
     
     # Andrew's method, rewritten slightly so that it does not rely on anything defined in propagate
     def MMUT_Prop(self, initial_density, intpts=2000):
@@ -1189,12 +1220,12 @@ if __name__ == '__main__':
     mlham.plottrainhamerr()
 
     # propagate using ML Hamiltonian with no field
-    # MLsol = mlham.propagate(mlham.MLhamrhs, mlham.denMOflat[mlham.offset,:], mytol=1e-6)
-    MLsol = mlham.MMUT_Prop(mlham.denMOflat[mlham.offset,:])
-    print(MLsol.shape)
+    MLsol = mlham.propagate(mlham.MLham, mlham.denMOflat[mlham.offset,:], mytol=1e-6)
+    # MLsol = mlham.MMUT_Prop(mlham.denMOflat[mlham.offset,:])
+    # print(MLsol.shape)
 
     # propagate using Exact Hamiltonian with no field
-    EXsol = mlham.propagate(mlham.EXhamrhs, mlham.denMOflat[mlham.offset,:], mytol=1e-6)
+    EXsol = mlham.propagate(mlham.EXham, mlham.denMOflat[mlham.offset,:], mytol=1e-6)
 
     # quantitatively and graphically compare the trajectories we just obtained against denMO
     # bigger figure for LiH
@@ -1208,10 +1239,10 @@ if __name__ == '__main__':
     mlham.graphcomparetraj(MLsol, EXsol, mlham.denMO, fs)
 
     # propagate using ML Hamiltonian with field
-    MLsolWF = mlham.propagate(mlham.MLhamwfrhs, mlham.fielddenMOflat[mlham.offset,:], mytol=1e-6)
+    MLsolWF = mlham.propagate(mlham.MLham, mlham.fielddenMOflat[mlham.offset,:], mytol=1e-6, field=True)
 
     # propagate using Exact Hamiltonian with field
-    EXsolWF = mlham.propagate(mlham.EXhamwfrhs, mlham.fielddenMOflat[mlham.offset,:], mytol=1e-6)
+    EXsolWF = mlham.propagate(mlham.EXham, mlham.fielddenMOflat[mlham.offset,:], mytol=1e-6, field=True)
     
     # quantitatively and graphically compare the trajectories we just obtained against denMO
     # bigger figure for LiH
