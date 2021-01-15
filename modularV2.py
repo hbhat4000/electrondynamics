@@ -688,6 +688,39 @@ class LearnHam:
         THISsol = si.solve_ivp(rhsfunc, [0, self.tvec[-1]], initcond, 'RK45', t_eval = self.tvec, rtol=mytol, atol=mytol)
         return THISsol.y
 
+    # Andrew's method
+    def fock_build(self,pin):
+        p = pin.reshape(self.drc,self.drc)
+        pAO = self.xmat @ p @ self.xmat.conj().T
+        twoe = self.get_ee_onee_AO(pAO)
+        hAO = np.array(self.kinmat - self.enmat, dtype=np.complex128) + twoe
+        h = -self.xmat.conj().T @ hAO @ self.xmat
+        return h
+    
+    # Andrew's method, rewritten slightly so that it does not rely on anything defined in propagate
+    def MMUT_Prop(self, initial_density, intpts=2000):
+        self.intpts = intpts
+        ntvec = intpts-self.offset
+        self.tvec = self.dt*np.arange(ntvec)
+        propagated_dens = np.zeros((self.drc**2,ntvec), dtype=np.complex128)
+        propagated_dens[:,0] = initial_density
+        for i in range(1,ntvec):
+            if i == 1:
+                P_n_min_12 = initial_density
+                P_n = P_n_min_12 + 0.5*self.dt*self.EXhamrhs(i,P_n_min_12)
+                P_n = P_n.reshape(self.drc,self.drc)
+                F_n = self.fock_build(P_n)
+                P_n_min_12 =  P_n_min_12.reshape(self.drc,self.drc)
+            else:
+                P_n_min_12 = P_n_plus_12
+                F_n = self.fock_build(P_n_plus_1)
+
+            P_n_plus_12 = sl.expm(-1j*self.dt*F_n) @ P_n_min_12 @ sl.expm(1j*self.dt*F_n)
+            propagated_dens[:,i] = P_n_plus_12.reshape(self.drc**2)
+            P_n_plus_1 = sl.expm(-1j*self.dt/2*F_n) @  P_n_plus_12 @ sl.expm(1j*self.dt/2*F_n)
+
+        return propagated_dens
+
     # think of traj1 and traj2 as two different numerical solutions that we got by running propagate
     # and groundtruth as the ground truth
     # here we compare the two trajectories QUANTITATIVELY
@@ -1156,7 +1189,9 @@ if __name__ == '__main__':
     mlham.plottrainhamerr()
 
     # propagate using ML Hamiltonian with no field
-    MLsol = mlham.propagate(mlham.MLhamrhs, mlham.denMOflat[mlham.offset,:], mytol=1e-6)
+    # MLsol = mlham.propagate(mlham.MLhamrhs, mlham.denMOflat[mlham.offset,:], mytol=1e-6)
+    MLsol = mlham.MMUT_Prop(mlham.denMOflat[mlham.offset,:])
+    print(MLsol.shape)
 
     # propagate using Exact Hamiltonian with no field
     EXsol = mlham.propagate(mlham.EXhamrhs, mlham.denMOflat[mlham.offset,:], mytol=1e-6)
