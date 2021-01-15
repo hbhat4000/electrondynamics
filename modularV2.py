@@ -584,8 +584,7 @@ class LearnHam:
         plt.close()
         return True    
         
-    # EXACT deltakick Hamiltonian
-    # this function is defined for propagation purposes
+    # EXACT Hamiltonian
     # this function takes in a scalar time, and a density *matrix* p (not flattened)
     def EXham(self, t, p, field=False):        
         pAO = self.xmat @ p @ self.xmat.conj().T
@@ -604,20 +603,8 @@ class LearnHam:
         
         h = -self.xmat.conj().T @ hAO @ self.xmat
         return h
-        # rhs = (h @ p - p @ h)/(1j)
-        # return rhs.reshape(self.drc**2)
-
-    # # Andrew's method
-    # def fock_build(self, pin):
-    #     p = pin.reshape(self.drc,self.drc)
-    #     pAO = self.xmat @ p @ self.xmat.conj().T
-    #     twoe = self.get_ee_onee_AO(pAO)
-    #     hAO = np.array(self.kinmat - self.enmat, dtype=np.complex128) + twoe
-    #     h = -self.xmat.conj().T @ hAO @ self.xmat
-    #     return h
     
-    # MACHINE LEARNED deltakick Hamiltonian, NO FIELD
-    # this function is defined for propagation purposes
+    # MACHINE LEARNED Hamiltonian
     # this function takes in a scalar time, and a density *matrix* p (not flattened)
     def MLham(self, t, p, field=False):
         # MACHINE LEARNED deltakick Hamiltonian
@@ -649,66 +636,6 @@ class LearnHam:
             h -= self.fieldsign * self.xmat.conj().T @ hfieldAO @ self.xmat
         
         return h
-        # rhs = (h @ p - p @ h)/(1j)
-        # return rhs.reshape(self.drc**2)
-
-    # EXACT deltakick Hamiltonian, WITH FIELD ON
-    # this function is defined for propagation purposes
-    # def EXhamwfrhs(self, t, pin):
-    #     freq = 0.0428
-    #     if t > 2*np.pi/freq:
-    #         ez = 0
-    #     elif t < 0:
-    #         ez = 0
-    #     else:
-    #         ez = 0.05*np.sin(0.0428*t)
-
-    #     hfieldAO = np.array(ez*self.didat[2], dtype=np.complex128)
-
-    #     p = pin.reshape(self.drc,self.drc)
-    #     pAO = self.xmat @ p @ self.xmat.conj().T
-    #     twoe = self.get_ee_onee_AO(pAO)
-        
-    #     hAO = (np.array(self.kinmat - self.enmat, dtype=np.complex128) + twoe) + self.fieldsign * hfieldAO
-    #     h = -self.xmat.conj().T @ hAO @ self.xmat
-
-    #     rhs = (h @ p - p @ h)/(1j)
-    #     return rhs.reshape(self.drc**2)
-
-    # MACHINE LEARNED deltakick Hamiltonian, WITH FIELD ON
-    # this function is defined for propagation purposes
-    # def MLhamwfrhs(self, t, pin):
-    #     freq = 0.0428
-    #     if t > 2*np.pi/freq:
-    #         ez = 0
-    #     elif t < 0:
-    #         ez = 0
-    #     else:
-    #         ez = 0.05*np.sin(0.0428*t)
-
-    #     hfieldAO = np.array(ez*self.didat[2], dtype=np.complex128)
-
-    #     p = pin.reshape(self.drc,self.drc)
-
-    #     # MACHINE LEARNED deltakick Hamiltonian
-    #     pflat = np.zeros(self.ndof, dtype=np.complex128)
-    #     for ij in self.nzreals:
-    #         pflat[self.nzreals[ij]] = np.real(p[ij[0], ij[1]])
-    #     for ij in self.nzimags:
-    #         pflat[self.nzimags[ij]] = np.imag(p[ij[0], ij[1]])
-
-    #     hflat = np.matmul(self.rgm(pflat, t)[:,0], self.blocktheta(self.theta)) # + thtMOvec
-    #     h = np.zeros((self.drc,self.drc), dtype=np.complex128)
-    #     for ij in self.hamreals:
-    #         h[ij[0], ij[1]] = hflat[self.hamreals[ij]]
-    #         h[ij[1], ij[0]] = hflat[self.hamreals[ij]]
-    #     for ij in self.hamimags:
-    #         h[ij[0], ij[1]] += (1J)*hflat[self.hamimags[ij]]
-    #         h[ij[1], ij[0]] -= (1J)*hflat[self.hamimags[ij]]
-        
-    #     h -= self.fieldsign * self.xmat.conj().T @ hfieldAO @ self.xmat
-    #     rhs = (h @ p - p @ h)/(1j)
-    #     return rhs.reshape(self.drc**2)
     
     # propagate one method forward in time from self.offset to intpts = "integration points"
     # use initial condition given by initcond
@@ -721,7 +648,7 @@ class LearnHam:
         # it returns a flattened right-hand side of the TDHF equation
         def rhsfunc(t, pin):
             p = pin.reshape(self.drc,self.drc)
-            h = hamfunc(p)
+            h = hamfunc(t, p, field)
             rhs = (h @ p - p @ h)/(1j)
             return rhs.reshape(self.drc**2)
 
@@ -729,25 +656,25 @@ class LearnHam:
         return THISsol.y
     
     # Andrew's method, rewritten slightly so that it does not rely on anything defined in propagate
-    def MMUT_Prop(self, initial_density, intpts=2000):
+    def MMUT_Prop(self, hamfunc, initial_density, intpts=2000, field=False):
         self.intpts = intpts
         ntvec = intpts-self.offset
         self.tvec = self.dt*np.arange(ntvec)
         propagated_dens = np.zeros((self.drc**2,ntvec), dtype=np.complex128)
         propagated_dens[:,0] = initial_density
-        for i in range(1,ntvec):
-            if i == 1:
-                P_n_min_12 = initial_density
-                P_n = P_n_min_12 + 0.5*self.dt*self.EXhamrhs(i,P_n_min_12)
-                P_n = P_n.reshape(self.drc,self.drc)
-                F_n = self.fock_build(P_n)
-                P_n_min_12 =  P_n_min_12.reshape(self.drc,self.drc)
+        for i in range(ntvec-1):
+            if i == 0:
+                P_n_min_12 = initial_density.reshape((self.drc, self.drc))  # keep as a matrix
+                h = hamfunc(i*dt, P_n_min_12, field)                        # returns a matrix
+                tdhfrhs = (h @ p - p @ h)/(1j)                              # also a matrix
+                P_n = P_n_min_12 + 0.5*self.dt*tdhfrhs                      # matrix equation
+                F_n = hamfunc(i*dt, P_n, field)                             # still a matrix!
             else:
                 P_n_min_12 = P_n_plus_12
-                F_n = self.fock_build(P_n_plus_1)
+                F_n = hamfunc(i*dt, P_n_plus_1, field)
 
             P_n_plus_12 = sl.expm(-1j*self.dt*F_n) @ P_n_min_12 @ sl.expm(1j*self.dt*F_n)
-            propagated_dens[:,i] = P_n_plus_12.reshape(self.drc**2)
+            propagated_dens[:,i] = P_n_plus_12.reshape((self.drc**2))       # flatten only to store
             P_n_plus_1 = sl.expm(-1j*self.dt/2*F_n) @  P_n_plus_12 @ sl.expm(1j*self.dt/2*F_n)
 
         return propagated_dens
@@ -1220,9 +1147,9 @@ if __name__ == '__main__':
     mlham.plottrainhamerr()
 
     # propagate using ML Hamiltonian with no field
-    MLsol = mlham.propagate(mlham.MLham, mlham.denMOflat[mlham.offset,:], mytol=1e-6)
-    # MLsol = mlham.MMUT_Prop(mlham.denMOflat[mlham.offset,:])
-    # print(MLsol.shape)
+    # MLsol = mlham.propagate(mlham.MLham, mlham.denMOflat[mlham.offset,:], mytol=1e-6)
+    MLsol = mlham.MMUT_Prop(mlham.MLham, mlham.denMOflat[mlham.offset,:])
+    print(MLsol.shape)
 
     # propagate using Exact Hamiltonian with no field
     EXsol = mlham.propagate(mlham.EXham, mlham.denMOflat[mlham.offset,:], mytol=1e-6)
@@ -1239,8 +1166,10 @@ if __name__ == '__main__':
     mlham.graphcomparetraj(MLsol, EXsol, mlham.denMO, fs)
 
     # propagate using ML Hamiltonian with field
-    MLsolWF = mlham.propagate(mlham.MLham, mlham.fielddenMOflat[mlham.offset,:], mytol=1e-6, field=True)
-
+    # MLsolWF = mlham.propagate(mlham.MLham, mlham.fielddenMOflat[mlham.offset,:], mytol=1e-6, field=True)
+    MLsolWF = mlham.MMUT_Prop(mlham.MLham, mlham.denMOflat[mlham.offset,:], field=True)
+    print(MLsolWF.shape)
+    
     # propagate using Exact Hamiltonian with field
     EXsolWF = mlham.propagate(mlham.EXham, mlham.fielddenMOflat[mlham.offset,:], mytol=1e-6, field=True)
     
