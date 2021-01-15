@@ -674,7 +674,7 @@ class LearnHam:
                 F_n = hamfunc(i*self.dt, P_n_plus_1, field)
 
             P_n_plus_12 = sl.expm(-1j*self.dt*F_n) @ P_n_min_12 @ sl.expm(1j*self.dt*F_n)
-            propagated_dens[:,i] = P_n_plus_12.reshape((self.drc**2))       # flatten only to store
+            propagated_dens[:,i+1] = P_n_plus_12.reshape((self.drc**2))     # flatten only to store
             P_n_plus_1 = sl.expm(-1j*self.dt/2*F_n) @  P_n_plus_12 @ sl.expm(1j*self.dt/2*F_n)
 
         return propagated_dens
@@ -1147,12 +1147,12 @@ if __name__ == '__main__':
     mlham.plottrainhamerr()
 
     # propagate using ML Hamiltonian with no field
-    # MLsol = mlham.propagate(mlham.MLham, mlham.denMOflat[mlham.offset,:], mytol=1e-6)
+    # MLsol = mlham.propagate(mlham.MLham, mlham.denMOflat[mlham.offset,:], mytol=1e-9)
     MLsol = mlham.MMUT_Prop(mlham.MLham, mlham.denMOflat[mlham.offset,:])
     print(MLsol.shape)
 
     # propagate using Exact Hamiltonian with no field
-    EXsol = mlham.propagate(mlham.EXham, mlham.denMOflat[mlham.offset,:], mytol=1e-6)
+    EXsol = mlham.propagate(mlham.EXham, mlham.denMOflat[mlham.offset,:], mytol=1e-9)
 
     # quantitatively and graphically compare the trajectories we just obtained against denMO
     # bigger figure for LiH
@@ -1166,12 +1166,12 @@ if __name__ == '__main__':
     mlham.graphcomparetraj(MLsol, EXsol, mlham.denMO, fs)
 
     # propagate using ML Hamiltonian with field
-    # MLsolWF = mlham.propagate(mlham.MLham, mlham.fielddenMOflat[mlham.offset,:], mytol=1e-6, field=True)
+    # MLsolWF = mlham.propagate(mlham.MLham, mlham.fielddenMOflat[mlham.offset,:], mytol=1e-9, field=True)
     MLsolWF = mlham.MMUT_Prop(mlham.MLham, mlham.denMOflat[mlham.offset,:], field=True)
     print(MLsolWF.shape)
     
     # propagate using Exact Hamiltonian with field
-    EXsolWF = mlham.propagate(mlham.EXham, mlham.fielddenMOflat[mlham.offset,:], mytol=1e-6, field=True)
+    EXsolWF = mlham.propagate(mlham.EXham, mlham.fielddenMOflat[mlham.offset,:], mytol=1e-9, field=True)
     
     # quantitatively and graphically compare the trajectories we just obtained against denMO
     # bigger figure for LiH
