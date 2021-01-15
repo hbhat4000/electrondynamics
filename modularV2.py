@@ -665,13 +665,13 @@ class LearnHam:
         for i in range(ntvec-1):
             if i == 0:
                 P_n_min_12 = initial_density.reshape((self.drc, self.drc))  # keep as a matrix
-                h = hamfunc(i*dt, P_n_min_12, field)                        # returns a matrix
-                tdhfrhs = (h @ p - p @ h)/(1j)                              # also a matrix
+                h = hamfunc(i*self.dt, P_n_min_12, field)                   # returns a matrix
+                tdhfrhs = (h @ P_n_min_12 - P_n_min_12 @ h)/(1j)            # also a matrix
                 P_n = P_n_min_12 + 0.5*self.dt*tdhfrhs                      # matrix equation
-                F_n = hamfunc(i*dt, P_n, field)                             # still a matrix!
+                F_n = hamfunc(i*self.dt, P_n, field)                        # still a matrix!
             else:
                 P_n_min_12 = P_n_plus_12
-                F_n = hamfunc(i*dt, P_n_plus_1, field)
+                F_n = hamfunc(i*self.dt, P_n_plus_1, field)
 
             P_n_plus_12 = sl.expm(-1j*self.dt*F_n) @ P_n_min_12 @ sl.expm(1j*self.dt*F_n)
             propagated_dens[:,i] = P_n_plus_12.reshape((self.drc**2))       # flatten only to store
