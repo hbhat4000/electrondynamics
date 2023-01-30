@@ -1,7 +1,8 @@
 # object-oriented Python code
 # 1) analytical gradient and Hessian
 # 2) single trajectory
-# 3) Hamiltonian real depends on real and imag depends on imag # 4) Hamiltonian has zeros in locations where density matrices have zeros; all other DOFs are active
+# 3) Hamiltonian real depends on real and imag depends on imag 
+# 4) Hamiltonian has zeros in locations where density matrices have zeros; all other DOFs are active
 # 5) least squares training
 
 import matplotlib
